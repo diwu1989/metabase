@@ -29,17 +29,17 @@
 
 ;; make sure we can do a basic query with MBQL source-query
 (datasets/expect-with-engines (engines-that-support :nested-queries)
-  {:rows [[1  4 10.0646 -165.374 "Red Medicine"                 3]
-          [2 11 34.0996 -118.329 "Stout Burgers & Beers"        2]
-          [3 11 34.0406 -118.428 "The Apple Pan"                2]
-          [4 29 33.9997 -118.465 "Wurstküche"                   2]
-          [5 20 34.0778 -118.261 "Brite Spot Family Restaurant" 2]]
-   :cols [{:name "id",          :base_type (data/id-field-type)}
-          {:name "category_id", :base_type :type/Integer}
+  {:rows [[ 4 10.0646 -165.374 "Red Medicine"                 3 1]
+          [11 34.0996 -118.329 "Stout Burgers & Beers"        2 2]
+          [11 34.0406 -118.428 "The Apple Pan"                2 3]
+          [29 33.9997 -118.465 "Wurstküche"                   2 4]
+          [20 34.0778 -118.261 "Brite Spot Family Restaurant" 2 5]]
+   :cols [{:name "category_id", :base_type :type/Integer}
           {:name "latitude",    :base_type :type/Float}
           {:name "longitude",   :base_type :type/Float}
           {:name "name",        :base_type :type/Text}
-          {:name "price",       :base_type :type/Integer}]}
+          {:name "price",       :base_type :type/Integer}
+          {:name "id",          :base_type (data/id-field-type)}]}
   (rows+cols
     (qp/process-query
       {:database (data/id)

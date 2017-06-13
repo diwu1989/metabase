@@ -473,22 +473,26 @@
                      :display_name "Name"
                      :base_type    "type/Text"
                      :table_id     card-virtual-table-id
-                     :id           ["field-literal" "NAME" "type/Text"]}
+                     :id           ["field-literal" "NAME" "type/Text"]
+                     :special_type nil}
                     {:name         "ID"
                      :display_name "ID"
                      :base_type    "type/Integer"
                      :table_id     card-virtual-table-id
-                     :id           ["field-literal" "ID" "type/Integer"]}
+                     :id           ["field-literal" "ID" "type/Integer"]
+                     :special_type nil}
                     {:name         "PRICE"
                      :display_name "Price"
                      :base_type    "type/Integer"
                      :table_id     card-virtual-table-id
-                     :id           ["field-literal" "PRICE" "type/Integer"]}
+                     :id           ["field-literal" "PRICE" "type/Integer"]
+                     :special_type nil}
                     {:name         "LATITUDE"
                      :display_name "Latitude"
                      :base_type    "type/Float"
                      :table_id     card-virtual-table-id
-                     :id           ["field-literal" "LATITUDE" "type/Float"]}]})
+                     :id           ["field-literal" "LATITUDE" "type/Float"]
+                     :special_type nil}]})
   (do
     ;; run the Card which will populate its result_metadata column
     ((user->client :crowberto) :post 200 (format "card/%d/query" (u/get-id card)))
