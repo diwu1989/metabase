@@ -27,7 +27,7 @@ export default class FieldName extends Component {
 
     displayNameForFieldLiteral(tableMetadata, fieldLiteral) {
         // see if we can find an entry in the table metadata that matches the field literal
-        let matchingField = _.find(tableMetadata.fields, (field) => field.id[1] === fieldLiteral[1]);
+        let matchingField = _.find(tableMetadata.fields, (field) => Query.isFieldLiteral(field.id) && field.id[1] === fieldLiteral[1]); // check whether names of field literals match
 
         return (matchingField && matchingField.display_name) || fieldLiteral[1];
     }
