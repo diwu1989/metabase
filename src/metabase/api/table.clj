@@ -107,8 +107,13 @@
      :id           (str "card__" id)
      :fields       (for [col metadata]
                      (assoc col
-                       :table_id (str "card__" id)
-                       :id       [:field-literal (:name col) (:base_type col)]))}))
+                       :table_id     (str "card__" id)
+                       :id           [:field-literal (:name col) (:base_type col)]
+                       ;; don't return :special_type if it's a PK or FK because it confuses the frontend since it can't actually be used that way IRL
+                       :special_type (when-let [special-type (keyword (:special_type col))]
+                                       (when-not (or (isa? special-type :type/PK)
+                                                     (isa? special-type :type/FK))
+                                         special-type))))}))
 
 (api/defendpoint GET "/card__:id/fks"
   "Return FK info for the 'virtual' table for a Card. This is always empty, so this endpoint
