@@ -67,8 +67,12 @@
 
 (defn sort-fields
   "Sort FIELDS by their \"importance\" vectors."
-  [query fields]
-  (let [field-importance (field-importance-fn query)]
-    (when-not i/*disable-qp-logging*
-      (log/debug (u/format-color 'yellow "Sorted fields:\n%s" (u/pprint-to-str (sort (map field-importance fields))))))
-    (sort-by field-importance fields)))
+  [inner-query fields]
+  (if (:source-query inner-query)
+    ;; if we're using a source query maintain the original ordering :D
+    fields
+    ;; otherwise calculate "importance vectors" and sort by those
+    (let [field-importance (field-importance-fn inner-query)]
+      (when-not i/*disable-qp-logging*
+        (log/debug (u/format-color 'yellow "Sorted fields:\n%s" (u/pprint-to-str (sort (map field-importance fields))))))
+      (sort-by field-importance fields))))
