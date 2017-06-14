@@ -21,6 +21,13 @@
 
 ;;; ## Field Resolution
 
+(defn- valid-collected-field? [keep-date-time-fields? f]
+  (or (instance? metabase.query_processor.interface.Field f)
+      (instance? metabase.query_processor.interface.FieldLiteral f)
+      (instance? metabase.query_processor.interface.ExpressionRef f)
+      (when keep-date-time-fields?
+        (instance? metabase.query_processor.interface.DateTimeField f))))
+
 (defn collect-fields
   "Return a sequence of all the `Fields` inside THIS, recursing as needed for collections.
    For maps, add or `conj` to property `:path`, recording the keypath used to reach each `Field.`
@@ -29,11 +36,7 @@
      (collect-fields [{:name \"id\", ...}])   -> [{:name \"id\", ...}]
      (collect-fields {:a {:name \"id\", ...}) -> [{:name \"id\", :path [:a], ...}]"
   [this & [keep-date-time-fields?]]
-  {:post [(every? (fn [f]
-                    (or (instance? metabase.query_processor.interface.Field f)
-                        (instance? metabase.query_processor.interface.ExpressionRef f)
-                        (when keep-date-time-fields?
-                          (instance? metabase.query_processor.interface.DateTimeField f)))) %)]}
+  {:post [(every? (partial valid-collected-field? keep-date-time-fields?) %)]}
   (condp instance? this
     ;; For a DateTimeField we'll flatten it back into regular Field but include the :unit info for the frontend.
     ;; Recurse so it is otherwise handled normally
@@ -49,6 +52,9 @@
     (if-let [parent (:parent this)]
       [this parent]
       [this])
+
+    metabase.query_processor.interface.FieldLiteral
+    [this]
 
     metabase.query_processor.interface.ExpressionRef
     [(assoc this :field-display-name (:expression-name this))]
@@ -184,14 +190,15 @@
   "When create info maps for any fields we didn't expect to come back from the query.
    Ideally, this should never happen, but on the off chance it does we still want to return it in the results."
   [inner-query actual-keys initial-rows fields]
-  {:pre [(set? actual-keys) (every? keyword? actual-keys)]}
+  {:pre [(sequential? actual-keys) (every? keyword? actual-keys)]}
   (let [expected-keys (u/prog1 (set (map :field-name fields))
                         (assert (every? keyword? <>)))
-        missing-keys  (set/difference actual-keys expected-keys)]
+        missing-keys  (set/difference (set actual-keys) expected-keys)]
     (when (seq missing-keys)
-      (log/warn (u/format-color 'yellow "There are fields we weren't expecting in the results: %s\nExpected: %s\nActual: %s"
-                  missing-keys expected-keys actual-keys)))
-    (concat fields (for [k missing-keys]
+      (log/warn (u/format-color 'yellow "There are fields we (maybe) weren't expecting in the results: %s\nExpected: %s\nActual: %s"
+                  missing-keys expected-keys (set actual-keys))))
+    (concat fields (for [k     actual-keys
+                         :when (contains? missing-keys k)]
                      (info-for-missing-key inner-query fields k (map k initial-rows))))))
 
 (defn- convert-field-to-expected-format
@@ -203,7 +210,7 @@
                   :id          nil
                   :table_id    nil}]
     (-> (merge defaults field)
-        (update :field-display-name name)
+        (update :field-display-name #(when % (name %)))
         (set/rename-keys {:base-type          :base_type
                           :field-display-name :display_name
                           :field-id           :id
@@ -256,17 +263,26 @@
   "Collect the Fields referenced in INNER-QUERY, sort them according to the rules at the top
    of this page, format them as expected by the frontend, and return the results."
   [inner-query result-keys initial-rows]
-  {:pre [(set? result-keys)]}
+  {:pre [(sequential? result-keys)]}
   (when (seq result-keys)
     (->> (collect-fields (dissoc inner-query :expressions))
+         ;; qualify the field name to make sure it matches what will come back. (For Mongo nested queries only)
          (map qualify-field-name)
+         ;; add entries for aggregate fields
          (add-aggregate-fields-if-needed inner-query)
+         ;; make field-name a keyword
          (map (u/rpartial update :field-name keyword))
+         ;; add entries for fields we weren't expecting
          (add-unknown-fields-if-needed inner-query result-keys initial-rows)
+         ;; remove expected fields not present in the results, and make sure they're unique
+         (filter (comp (partial contains? (set result-keys)) :field-name))
+         ;; now sort the fields
          (sort/sort-fields inner-query)
+         ;; remove any duplicate entires
+         (m/distinct-by :field-name)
+         ;; convert them to the format expected by the frontend
          (map convert-field-to-expected-format)
-         (filter (comp (partial contains? result-keys) :name))
-         (m/distinct-by :name)
+         ;; add FK info
          add-extra-info-to-fk-fields)))
 
 (defn annotate-and-sort
@@ -278,7 +294,7 @@
   [query {:keys [columns rows], :as results}]
   (let [row-maps (for [row rows]
                    (zipmap columns row))
-        cols    (resolve-sort-and-format-columns (:query query) (set columns) (take 10 row-maps))
+        cols    (resolve-sort-and-format-columns (:query query) (distinct columns) (take 10 row-maps))
         columns (mapv :name cols)]
     (assoc results
       :cols    (vec (for [col cols]

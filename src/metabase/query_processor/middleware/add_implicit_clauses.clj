@@ -22,8 +22,7 @@
   "Return the all fields for SOURCE-TABLE, for use as an implicit `:fields` clause."
   [{{source-table-id :id, :as source-table} :source-table, :as inner-query}]
   ;; Sort the implicit FIELDS so the SQL (or other native query) that gets generated (mostly) approximates the 'magic' sorting
-  ;; we do on the results. This is done because queries that use source queries don't participate in the 'magic' sorting.
-  ;; In the future, this should eventually eliminate the need to do magic result sorting entirely. (Hopefully)
+  ;; we do on the results. This is done so when the outer query we generate is a `SELECT *` the order doesn't change
   (for [field (sort/sort-fields inner-query (fetch-fields-for-souce-table-id source-table-id))
         :let  [field (resolve/resolve-table (i/map->Field field) {[nil source-table-id] source-table})]]
     (if (qputil/datetime-field? field)

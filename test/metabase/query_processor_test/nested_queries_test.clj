@@ -10,6 +10,7 @@
             [metabase.models
              [card :refer [Card]]
              [database :as database]
+             [field :refer [Field]]
              [table :refer [Table]]]
             [metabase.test.data :as data]
             [metabase.test.data.datasets :as datasets]
@@ -29,17 +30,17 @@
 
 ;; make sure we can do a basic query with MBQL source-query
 (datasets/expect-with-engines (engines-that-support :nested-queries)
-  {:rows [[ 4 10.0646 -165.374 "Red Medicine"                 3 1]
-          [11 34.0996 -118.329 "Stout Burgers & Beers"        2 2]
-          [11 34.0406 -118.428 "The Apple Pan"                2 3]
-          [29 33.9997 -118.465 "Wurstküche"                   2 4]
-          [20 34.0778 -118.261 "Brite Spot Family Restaurant" 2 5]]
-   :cols [{:name "category_id", :base_type :type/Integer}
+  {:rows [[1 "Red Medicine"                  4 10.0646 -165.374 3]
+          [2 "Stout Burgers & Beers"        11 34.0996 -118.329 2]
+          [3 "The Apple Pan"                11 34.0406 -118.428 2]
+          [4 "Wurstküche"                   29 33.9997 -118.465 2]
+          [5 "Brite Spot Family Restaurant" 20 34.0778 -118.261 2]]
+   :cols [{:name "id",          :base_type :type/BigInteger}
+          {:name "name",        :base_type :type/Text}
+          {:name "category_id", :base_type :type/Integer}
           {:name "latitude",    :base_type :type/Float}
           {:name "longitude",   :base_type :type/Float}
-          {:name "name",        :base_type :type/Text}
-          {:name "price",       :base_type :type/Integer}
-          {:name "id",          :base_type (data/id-field-type)}]}
+          {:name "price",       :base_type :type/Integer}]}
   (rows+cols
     (qp/process-query
       {:database (data/id)
@@ -54,38 +55,64 @@
    (Normally this is just `venues`, but some databases like Redshift do clever hacks
    like prefixing table names with a unique schema for each test run because we're not
    allowed to create new databases.)"
-  []
-  (let [{schema :schema, table-name :name} (db/select-one [Table :name :schema] :id (data/id :venues))]
-    (name (hsql/qualify schema table-name))))
+  ([]
+   (let [{schema :schema, table-name :name} (db/select-one [Table :name :schema] :id (data/id :venues))]
+     (name (hsql/qualify schema table-name))))
+  ([column]
+   (db/select-one-field :name Field :table_id (data/id :venues), :%lower.name (str/lower-case (name column)))))
 
 ;; make sure we can do a basic query with a SQL source-query
 (datasets/expect-with-engines (engines-that-support :nested-queries)
-  {:rows [[ 4 1 10.0646 -165.374 "Red Medicine"                 3]
-          [11 2 34.0996 -118.329 "Stout Burgers & Beers"        2]
-          [11 3 34.0406 -118.428 "The Apple Pan"                2]
-          [29 4 33.9997 -118.465 "Wurstküche"                   2]
-          [20 5 34.0778 -118.261 "Brite Spot Family Restaurant" 2]]
-   :cols [{:name "category_id", :base_type :type/Integer}
-          {:name "id",          :base_type :type/Integer}
-          {:name "latitude",    :base_type :type/Float}
+  {:rows [[1 -165.374  4 3 "Red Medicine"                 10.0646]
+          [2 -118.329 11 2 "Stout Burgers & Beers"        34.0996]
+          [3 -118.428 11 2 "The Apple Pan"                34.0406]
+          [4 -118.465 29 2 "Wurstküche"                   33.9997]
+          [5 -118.261 20 2 "Brite Spot Family Restaurant" 34.0778]]
+   :cols [{:name "id",          :base_type :type/Integer}
           {:name "longitude",   :base_type :type/Float}
+          {:name "category_id", :base_type :type/Integer}
+          {:name "price",       :base_type :type/Integer}
           {:name "name",        :base_type :type/Text}
-          {:name "price",       :base_type :type/Integer}]}
+          {:name "latitude",    :base_type :type/Float}]}
   (rows+cols
     (qp/process-query
       {:database (data/id)
        :type     :query
-       :query    {:source-query {:native (format "SELECT * FROM %s" (venues-identifier))}
+       :query    {:source-query {:native (format "SELECT %s, %s, %s, %s, %s, %s FROM %s"
+                                                 (venues-identifier :id)
+                                                 (venues-identifier :longitude)
+                                                 (venues-identifier :category_id)
+                                                 (venues-identifier :price)
+                                                 (venues-identifier :name)
+                                                 (venues-identifier :latitude)
+                                                 (venues-identifier))}
                   :order-by     [:asc [:field-literal (keyword (data/format-name :id)) :type/Integer]]
                   :limit        5}})))
 
+(defn- x []
+  (metabase.test.data.datasets/with-engine :postgres
+    (rows+cols
+      (qp/process-query
+        {:database (data/id)
+         :type     :query
+         :query    {:source-query {:native (format "SELECT %s, %s, %s, %s, %s, %s FROM %s"
+                                                   (venues-identifier :id)
+                                                   (venues-identifier :longitude)
+                                                   (venues-identifier :category_id)
+                                                   (venues-identifier :price)
+                                                   (venues-identifier :name)
+                                                   (venues-identifier :latitude)
+                                                   (venues-identifier))}
+                    :order-by     [:asc [:field-literal (keyword (data/format-name :id)) :type/Integer]]
+                    :limit        5}}))))
+
 (def ^:private ^:const breakout-results
-  {:rows [[22 1]
-          [59 2]
-          [13 3]
-          [ 6 4]]
-   :cols [{:name "count", :base_type :type/Integer}
-          {:name "price", :base_type :type/Integer}]})
+  {:rows [[1 22]
+          [2 59]
+          [3 13]
+          [4  6]]
+   :cols [{:name "price", :base_type :type/Integer}
+          {:name "count", :base_type :type/Integer}]})
 
 ;; make sure we can do a query with breakout and aggregation using an MBQL source query
 (datasets/expect-with-engines (engines-that-support :nested-queries)
@@ -146,12 +173,12 @@
 
 ;; make sure we can filter by a field literal
 (expect
-  {:rows [[4 1 10.0646 -165.374 "Red Medicine" 3]]
-   :cols [{:name "category_id", :base_type :type/Integer}
-          {:name "id",          :base_type :type/Integer}
+  {:rows [[1 "Red Medicine" 4 10.0646 -165.374 3]]
+   :cols [{:name "id",          :base_type :type/BigInteger}
+          {:name "name",        :base_type :type/Text}
+          {:name "category_id", :base_type :type/Integer}
           {:name "latitude",    :base_type :type/Float}
           {:name "longitude",   :base_type :type/Float}
-          {:name "name",        :base_type :type/Text}
           {:name "price",       :base_type :type/Integer}]}
   (rows+cols
     (qp/process-query
@@ -160,9 +187,14 @@
        :query    {:source-query {:source-table (data/id :venues)}
                   :filter       [:= [:field-literal (data/format-name :id) :type/Integer] 1]}})))
 
+(def ^:private ^:const ^String venues-source-sql
+  (str "(SELECT \"PUBLIC\".\"VENUES\".\"ID\" AS \"ID\", \"PUBLIC\".\"VENUES\".\"NAME\" AS \"NAME\", "
+       "\"PUBLIC\".\"VENUES\".\"CATEGORY_ID\" AS \"CATEGORY_ID\", \"PUBLIC\".\"VENUES\".\"LATITUDE\" AS \"LATITUDE\", "
+       "\"PUBLIC\".\"VENUES\".\"LONGITUDE\" AS \"LONGITUDE\", \"PUBLIC\".\"VENUES\".\"PRICE\" AS \"PRICE\" FROM \"PUBLIC\".\"VENUES\") \"source\""))
+
 ;; make sure that dots in field literal identifiers get escaped so you can't reference fields from other tables using them
 (expect
-  {:query  "SELECT * FROM (SELECT * FROM \"PUBLIC\".\"VENUES\") \"source\" WHERE \"BIRD.ID\" = 1 LIMIT 10"
+  {:query  (format "SELECT * FROM %s WHERE \"BIRD.ID\" = 1 LIMIT 10" venues-source-sql)
    :params nil}
   (qp/query->native
     {:database (data/id)
@@ -173,7 +205,7 @@
 
 ;; make sure that field-literals work as DateTimeFields
 (expect
-  {:query  "SELECT * FROM (SELECT * FROM \"PUBLIC\".\"VENUES\") \"source\" WHERE parsedatetime(formatdatetime(\"BIRD.ID\", 'YYYYww'), 'YYYYww') = 1 LIMIT 10"
+  {:query  (format "SELECT * FROM %s WHERE parsedatetime(formatdatetime(\"BIRD.ID\", 'YYYYww'), 'YYYYww') = 1 LIMIT 10" venues-source-sql)
    :params nil}
   (qp/query->native
     {:database (data/id)
@@ -189,7 +221,7 @@
                    "SELECT STDDEV(\"PUBLIC\".\"VENUES\".\"ID\") AS \"stddev\", \"PUBLIC\".\"VENUES\".\"PRICE\" AS \"PRICE\" "
                    "FROM \"PUBLIC\".\"VENUES\" "
                    "GROUP BY \"PUBLIC\".\"VENUES\".\"PRICE\" "
-                   "ORDER BY \"stddev\" DESC"
+                   "ORDER BY \"stddev\" DESC, \"PUBLIC\".\"VENUES\".\"PRICE\" ASC"
                ") \"source\"")
    :params nil}
   (qp/query->native
@@ -203,7 +235,7 @@
 
 ;; make sure that we handle [field-id [field-literal ...]] forms gracefully, despite that not making any sense
 (expect
-  {:query  "SELECT \"category_id\" AS \"category_id\" FROM (SELECT * FROM \"PUBLIC\".\"VENUES\") \"source\" GROUP BY \"category_id\" ORDER BY \"category_id\" ASC LIMIT 10"
+  {:query  (format "SELECT \"category_id\" AS \"category_id\" FROM %s GROUP BY \"category_id\" ORDER BY \"category_id\" ASC LIMIT 10" venues-source-sql)
    :params nil}
   (qp/query->native
     {:database (data/id)
@@ -214,7 +246,7 @@
 
 ;; Make sure we can filter by string fields
 (expect
-  {:query  "SELECT * FROM (SELECT * FROM \"PUBLIC\".\"VENUES\") \"source\" WHERE \"text\" <> ? LIMIT 10"
+  {:query  (format "SELECT * FROM %s WHERE \"text\" <> ? LIMIT 10" venues-source-sql)
    :params ["Coo"]}
   (qp/query->native {:database (data/id)
                      :type     :query
@@ -224,7 +256,7 @@
 
 ;; Make sure we can filter by number fields
 (expect
-  {:query  "SELECT * FROM (SELECT * FROM \"PUBLIC\".\"VENUES\") \"source\" WHERE \"sender_id\" > 3 LIMIT 10"
+  {:query  (format "SELECT * FROM %s WHERE \"sender_id\" > 3 LIMIT 10" venues-source-sql)
    :params nil}
   (qp/query->native {:database (data/id)
                      :type     :query

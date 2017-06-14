@@ -75,8 +75,10 @@
 (defprotocol IField
   "Methods specific to the Query Expander `Field` record type."
   (qualified-name-components [this]
-    "Return a vector of name components of the form `[table-name parent-names... field-name]`"))
-
+    "Return a vector of name components of the form `[table-name parent-names... field-name]`
+     (This should always return AT LEAST 2 components. If no table name should be used, return
+     `nil` as the first part.)"))
+;; TODO - Yes, I know, that makes no sense. `annotate/qualify-field-name` expects it that way tho
 
 ;;; +----------------------------------------------------------------------------------------------------------------------------------------------------------------+
 ;;; |                                                                             FIELDS                                                                             |
@@ -102,7 +104,7 @@
   (getName [_] field-name) ; (name <field>) returns the *unqualified* name of the field, #obvi
 
   IField
-  (qualified-name-components [this]
+  (qualified-name-components [_]
     (conj (if parent
             (qualified-name-components parent)
             [table-name])
@@ -166,7 +168,9 @@
                            base-type     :- su/FieldType
                            datetime-unit :- (s/maybe DatetimeFieldUnit)]
   clojure.lang.Named
-  (getName [_] field-name))
+  (getName [_] field-name)
+  IField
+  (qualified-name-components [_] [nil field-name]))
 
 
 (def FieldPlaceholderOrExpressionRef
