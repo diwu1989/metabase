@@ -8,11 +8,12 @@
 (defn- card-id->source-query
   "Return the source query info for Card with CARD-ID."
   [card-id]
-  (let [card         (db/select-one ['Card :dataset_query :database_id] :id card-id)
-        card-query   (:dataset_query card)]
+  (let [card       (db/select-one ['Card :dataset_query :database_id] :id card-id)
+        card-query (:dataset_query card)]
     (assoc (or (:query card-query)
-               (when-let [native-query (get-in card-query [:native :query])]
-                 {:native native-query})
+               (when-let [native (:native card-query)]
+                 {:native        (:query native)
+                  :template_tags (:template_tags native)})
                (throw (Exception. (str "Missing source query in Card " card-id))))
       ;; include database ID as well; we'll pass that up the chain so it eventually gets put in its spot in the outer-query
       :database (:database card-query))))

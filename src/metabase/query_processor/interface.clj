@@ -396,7 +396,8 @@
 (def SourceQuery
   "Schema for a valid value for a `:source-query` clause."
   (s/if :native
-    {:native s/Any}     ; TODO - what about native params (is that applicable?)
+    {:native                         s/Any
+     (s/optional-key :template_tags) s/Any}
     (s/recursive #'Query)))
 
 ;;; +----------------------------------------------------------------------------------------------------------------------------------------------------------------+
