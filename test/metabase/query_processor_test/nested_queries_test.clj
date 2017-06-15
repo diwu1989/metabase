@@ -89,23 +89,6 @@
                   :order-by     [:asc [:field-literal (keyword (data/format-name :id)) :type/Integer]]
                   :limit        5}})))
 
-(defn- x []
-  (metabase.test.data.datasets/with-engine :postgres
-    (rows+cols
-      (qp/process-query
-        {:database (data/id)
-         :type     :query
-         :query    {:source-query {:native (format "SELECT %s, %s, %s, %s, %s, %s FROM %s"
-                                                   (venues-identifier :id)
-                                                   (venues-identifier :longitude)
-                                                   (venues-identifier :category_id)
-                                                   (venues-identifier :price)
-                                                   (venues-identifier :name)
-                                                   (venues-identifier :latitude)
-                                                   (venues-identifier))}
-                    :order-by     [:asc [:field-literal (keyword (data/format-name :id)) :type/Integer]]
-                    :limit        5}}))))
-
 (def ^:private ^:const breakout-results
   {:rows [[1 22]
           [2 59]
