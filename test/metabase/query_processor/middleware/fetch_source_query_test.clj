@@ -35,7 +35,8 @@
    :type     :query
    :query    {:aggregation  [:count]
               :breakout     [[:field-literal :price :type/Integer]]
-              :source-query {:native (format "SELECT * FROM %s" (data/format-name "venues"))}}}
+              :source-query {:native        (format "SELECT * FROM %s" (data/format-name "venues"))
+                             :template_tags nil}}}
   (tt/with-temp Card [card {:dataset_query {:database (data/id)
                                             :type     :native
                                             :native   {:query (format "SELECT * FROM %s" (data/format-name "venues"))}}}]

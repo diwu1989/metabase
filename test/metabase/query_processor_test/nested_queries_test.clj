@@ -246,3 +246,20 @@
                      :query    {:source-query {:source-table (data/id :venues)}
                                 :limit        10
                                 :filter       [:> [:field-literal "sender_id" :type/Integer] 3]}}))
+
+;; make sure using a native query with default params as a source works
+(expect
+  {:query  "SELECT * FROM (SELECT * FROM PRODUCTS WHERE CATEGORY = 'Widget' LIMIT 10) \"source\" LIMIT 1048576",
+   :params nil}
+  (tt/with-temp Card [card {:dataset_query {:database (data/id)
+                                            :type     :native
+                                            :native   {:query         "SELECT * FROM PRODUCTS WHERE CATEGORY = {{category}} LIMIT 10"
+                                                       :template_tags {:category {:name         "category"
+                                                                                  :display_name "Category"
+                                                                                  :type         "text"
+                                                                                  :required     true
+                                                                                  :default      "Widget"}}}}}]
+    (qp/query->native
+      {:database (data/id)
+       :type     :query
+       :query    {:source-table (str "card__" (u/get-id card))}})))
